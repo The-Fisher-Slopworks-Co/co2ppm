@@ -3,57 +3,138 @@ SPDX-FileCopyrightText: 2026 The Fisher Slopworks Co
 SPDX-License-Identifier: AGPL-3.0-or-later
 -->
 
-# Slopworks project template
+# CO2 Exporter (ESP32 / ESP-IDF)
 
-The starting point for new [The Fisher Slopworks Co](https://github.com/The-Fisher-Slopworks-Co)
-repositories. It ships the **licensing baseline** every project must carry
-physically (licensing can't be inherited), already wired up and passing checks:
+ESP32 firmware that reads CO2 and temperature data from a ZyAura ZG-01 sensor
+(Voltcraft CO-100 and compatible) and exposes it as
+[Prometheus](https://prometheus.io/) metrics over HTTP.
 
-- **License — AGPL-3.0-or-later.** Root [`LICENSE`](LICENSE) plus the canonical
-  SPDX text in [`LICENSES/`](LICENSES/).
-- **[REUSE](https://reuse.software/) compliance.** A [`REUSE.toml`](REUSE.toml)
-  that declares the whole tree as `AGPL-3.0-or-later` © *The Fisher Slopworks Co*,
-  and a [`reuse.yml`](.github/workflows/reuse.yml) workflow that enforces `reuse lint`
-  on every push and pull request.
+This is an ESP-IDF port of the original ESP8266/Arduino project. The WiFi
+provisioning captive portal has been removed — credentials are hardcoded at
+build time (see [Configuration](#configuration)).
 
-Governance docs — the **Code of Conduct, security policy, and contributing
-guide** — are deliberately **not** shipped here. They are inherited org-wide from
-[`The-Fisher-Slopworks-Co/.github`](https://github.com/The-Fisher-Slopworks-Co/.github),
-so every repository gets them automatically without a per-repo copy.
+## Features
 
-## Using it
+- Reads CO2 (ppm) and temperature (°C) from ZG-01 via interrupt-driven bit-banging
+- HTTP `/metrics` endpoint in Prometheus text exposition format 0.0.4
+- WiFi station with hardcoded credentials and automatic reconnect
+- Buzzer alarm when CO2 exceeds the configured threshold (sustained for a configurable duration)
+- Quiet hours — buzzer suppressed during night
+- NTP time sync (configurable UTC offset)
 
-1. Click **“Use this template” → “Create a new repository”** on GitHub (or
-   `gh repo create <name> --template The-Fisher-Slopworks-Co/template`).
-2. Clone your new repository and run the initializer once:
+## Hardware
 
-   ```bash
-   ./scripts/init.sh
-   ```
+| Component | Description |
+|-----------|-------------|
+| ESP32 dev board | Main microcontroller |
+| ZyAura ZG-01 | CO2 + temperature sensor (e.g. Voltcraft CO-100) |
+| Active buzzer | CO2 threshold alarm |
 
-   It asks for the project name and tagline, writes a fresh project `README.md`,
-   deletes itself, and runs `reuse lint` to confirm the repository is still
-   compliant. (You can also run it non-interactively:
-   `./scripts/init.sh "My Project" "A short tagline."`)
+### Wiring (default pins)
 
-## Keeping a project compliant
-
-Every file needs copyright + license information. Source files and YAML carry an
-inline two-line SPDX header:
-
-```text
-SPDX-FileCopyrightText: 2026 The Fisher Slopworks Co
-SPDX-License-Identifier: AGPL-3.0-or-later
+```
+GPIO5  → ZG-C (clock)
+GPIO4  → ZG-D (data)
+GPIO14 → buzzer +
+GND    → ZG-G, buzzer −
 ```
 
-Files that can't hold a comment (JSON, binaries, some docs) are covered by the
-`**` default in [`REUSE.toml`](REUSE.toml). Verify any time with:
+Pins are configurable via `idf.py menuconfig` (see below).
+
+> **Note:** Some ZG-01 units have the connector in `D, C, G` order instead of
+> `C, D, G`. If you get no readings, try swapping CLK and DATA.
+>
+> Avoid using **GPIO12** for the buzzer — it is a strapping pin (flash voltage)
+> and driving it at boot can prevent startup. The default clock pin **GPIO5**
+> is also a strapping pin, but is safe here since it is only ever read as an
+> input after boot.
+
+> Sensor protocol reference: https://revspace.nl/CO2MeterHacking
+
+## Requirements
+
+[ESP-IDF](https://docs.espressif.com/projects/esp-idf/en/latest/esp32/get-started/)
+**v5.x or v6.x** (developed and built against v6.0).
+
+## Configuration
+
+All settings live in `idf.py menuconfig` under **CO2 Exporter Configuration**
+(stored in `sdkconfig`). The defaults come from `main/Kconfig.projbuild`.
+
+| Setting | Default | Description |
+|---------|---------|-------------|
+| `WIFI_SSID` | `YOUR_WIFI_SSID` | Network to connect to (**must change**) |
+| `WIFI_PASSWORD` | `YOUR_WIFI_PASSWORD` | WiFi password (**must change**) |
+| `DEVICE_NAME` | `daget` | `device="..."` label on every metric |
+| `PIN_CLK` | `5` | ZG-01 clock GPIO |
+| `PIN_DATA` | `4` | ZG-01 data GPIO |
+| `PIN_BUZZER` | `14` | Buzzer GPIO |
+| `TZ_OFFSET_HOURS` | `1` | UTC offset in hours (quiet hours only) |
+| `CO2_ALARM_PPM` | `900` | CO2 threshold (ppm) to trigger the buzzer |
+| `CO2_SUSTAIN_MS` | `300000` | CO2 must stay above threshold this long before alarm fires (5 min) |
+| `QUIET_HOUR_START` | `23` | Quiet hours start (inclusive) |
+| `QUIET_HOUR_END` | `10` | Quiet hours end (exclusive) |
+
+You can also set the WiFi credentials in `sdkconfig.defaults` before the first
+build:
+
+```
+CONFIG_WIFI_SSID="my-network"
+CONFIG_WIFI_PASSWORD="my-password"
+```
+
+## Build & Flash
 
 ```bash
-reuse lint
+# one-time, per checkout
+. $IDF_PATH/export.sh
+idf.py set-target esp32
+
+# configure WiFi credentials and any other settings
+idf.py menuconfig
+
+# build, flash, and watch the serial log
+idf.py build
+idf.py -p /dev/ttyUSB0 flash monitor
+```
+
+For other ESP32 variants use the matching target, e.g.
+`idf.py set-target esp32c3`.
+
+## Metrics
+
+The device starts an HTTP server on port 80 after boot.
+
+**`GET /metrics`** returns Prometheus-formatted data:
+
+```
+# HELP co2_ppm CO2 concentration in parts per million
+# TYPE co2_ppm gauge
+co2_ppm{device="daget"} 623
+
+# HELP temperature_celsius Temperature in degrees Celsius
+# TYPE temperature_celsius gauge
+temperature_celsius{device="daget"} 23.44
+```
+
+Returns HTTP 503 while no sensor data has been received yet.
+
+### Example Prometheus config
+
+```yaml
+scrape_configs:
+  - job_name: co2
+    static_configs:
+      - targets: ['<device-ip>:80']
 ```
 
 ## License
 
-This template is licensed under [AGPL-3.0-or-later](LICENSE) and is itself
-REUSE-compliant.
+CO2 Exporter is licensed under AGPL-3.0-or-later. See [LICENSE](LICENSE). The
+project is [REUSE](https://reuse.software/)-compliant.
+
+## Contributing
+
+Contribution guidelines, the Code of Conduct, and the security policy are shared
+org-wide via
+[The-Fisher-Slopworks-Co/.github](https://github.com/The-Fisher-Slopworks-Co/.github).

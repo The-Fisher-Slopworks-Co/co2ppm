@@ -1,0 +1,11 @@
+# SPDX-FileCopyrightText: 2026 The Fisher Slopworks Co
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
+# Project-wide default sdkconfig values.
+# Run `idf.py menuconfig` to change CO2 Exporter settings (WiFi, pins, alarm).
+
+# app_main calls into nvs/wifi/sntp/httpd setup — give it a little headroom.
+CONFIG_ESP_MAIN_TASK_STACK_SIZE=4096
+
+# HTTP server: two URI handlers is plenty.
+CONFIG_HTTPD_MAX_REQ_HDR_LEN=1024

@@ -34,8 +34,8 @@ reflashing to change networks (see [WiFi setup](#wifi-setup)).
 ### Wiring (default pins)
 
 ```
-GPIO5  → ZG-C (clock)
-GPIO4  → ZG-D (data)
+GPIO18 → ZG-C (clock)
+GPIO19 → ZG-D (data)
 GND    → ZG-G
 GPIO2  → status LED (on-board on most DevKit boards)
 ```
@@ -45,8 +45,9 @@ Pins are configurable via `idf.py menuconfig` (see below).
 > **Note:** Some ZG-01 units have the connector in `D, C, G` order instead of
 > `C, D, G`. If you get no readings, try swapping CLK and DATA.
 >
-> The default clock pin **GPIO5** is a strapping pin, but is safe here since it
-> is only ever read as an input after boot.
+> The defaults (GPIO18/GPIO19) are regular GPIOs. Avoid the ESP32 strapping
+> pins (GPIO0/2/5/12/15) for the sensor lines: the sensor drives them
+> continuously, including during reset, which can interfere with boot.
 
 > Sensor protocol reference: https://revspace.nl/CO2MeterHacking
 
@@ -65,8 +66,8 @@ All settings live in `idf.py menuconfig` under **CO2 Exporter Configuration**
 | `WIFI_SETUP_GRACE_SECONDS` | `30` | Seconds offline before the setup portal opens (see [WiFi setup](#wifi-setup)) |
 | `HOSTNAME` | `co2meter` | Hostname (DHCP/mDNS); also the base for the setup AP name |
 | `DEVICE_NAME` | `daget` | `device="..."` label on every metric |
-| `PIN_CLK` | `5` | ZG-01 clock GPIO |
-| `PIN_DATA` | `4` | ZG-01 data GPIO |
+| `PIN_CLK` | `18` | ZG-01 clock GPIO |
+| `PIN_DATA` | `19` | ZG-01 data GPIO |
 | `STATUS_LED_ENABLE` | `y` | Drive an on-board status LED |
 | `PIN_STATUS_LED` | `2` | Status LED GPIO |
 | `STATUS_LED_ACTIVE_LOW` | `n` | Set if the LED lights when the pin is driven low |

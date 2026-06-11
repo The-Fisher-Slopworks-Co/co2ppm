@@ -39,16 +39,18 @@ menu "CO2 Exporter Configuration"
 
         config PIN_CLK
             int "ZG-01 clock GPIO (CLK)"
-            default 5
+            default 18
             help
                 Connected to the sensor's C (clock) line. Falling-edge
-                interrupt source. GPIO5 is an ESP32 strapping pin but is fine
-                as a post-boot input; pick another GPIO if you need it free at
+                interrupt source. GPIO18 is a regular GPIO (not a strapping
+                pin), so the sensor's clock idle level can't interfere with
+                boot. Avoid the strapping pins (GPIO0/2/5/12/15) here, since
+                the sensor drives this line continuously — including during
                 reset.
 
         config PIN_DATA
             int "ZG-01 data GPIO (DATA)"
-            default 4
+            default 19
             help
                 Connected to the sensor's D (data) line. If you get no
                 readings, try swapping CLK and DATA — some ZG-01 units wire

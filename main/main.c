@@ -11,7 +11,6 @@
 #include "esp_event.h"
 #include "esp_log.h"
 #include "esp_netif.h"
-#include "esp_netif_sntp.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "nvs_flash.h"
@@ -32,16 +31,6 @@ static void init_nvs(void) {
     ESP_ERROR_CHECK(err);
 }
 
-static void init_sntp(void) {
-    esp_sntp_config_t config = ESP_NETIF_SNTP_DEFAULT_CONFIG("pool.ntp.org");
-    ESP_ERROR_CHECK(esp_netif_sntp_init(&config));
-    if (esp_netif_sntp_sync_wait(pdMS_TO_TICKS(10000)) != ESP_OK) {
-        ESP_LOGW(TAG, "NTP sync timed out (quiet hours may be off until it syncs)");
-    } else {
-        ESP_LOGI(TAG, "NTP synced");
-    }
-}
-
 static void sensor_task(void *arg) {
     for (;;) {
         zyaura_loop();
@@ -56,9 +45,8 @@ void app_main(void) {
     ESP_ERROR_CHECK(esp_netif_init());
     ESP_ERROR_CHECK(esp_event_loop_create_default());
 
-    zyaura_begin(CONFIG_PIN_CLK, CONFIG_PIN_DATA, CONFIG_PIN_BUZZER);
+    zyaura_begin(CONFIG_PIN_CLK, CONFIG_PIN_DATA);
     wifi_begin();
-    init_sntp();
     metrics_server_begin();
 
     xTaskCreate(sensor_task, "sensor", 4096, NULL, 5, NULL);

@@ -3,7 +3,8 @@
 //
 // Minimal WiFi station connect with hardcoded credentials.
 // No captive portal, no provisioning, no stored credentials — SSID and
-// password are baked in at build time via menuconfig.
+// password are baked in at build time via menuconfig. The station's
+// hostname (CONFIG_HOSTNAME) is also set here before connecting.
 
 #include "wifi.h"
 
@@ -40,7 +41,8 @@ static void on_wifi_event(void *arg, esp_event_base_t base, int32_t id, void *da
 void wifi_begin(void) {
     s_wifi_events = xEventGroupCreate();
 
-    esp_netif_create_default_wifi_sta();
+    esp_netif_t *netif = esp_netif_create_default_wifi_sta();
+    ESP_ERROR_CHECK(esp_netif_set_hostname(netif, CONFIG_HOSTNAME));
 
     wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
     ESP_ERROR_CHECK(esp_wifi_init(&cfg));

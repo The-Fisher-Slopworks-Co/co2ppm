@@ -20,6 +20,13 @@ menu "CO2 Exporter Configuration"
 
     endmenu
 
+    config HOSTNAME
+        string "Hostname"
+        default "co2meter"
+        help
+            Hostname advertised to the network (DHCP/mDNS). Defaults to
+            "co2meter".
+
     config DEVICE_NAME
         string "Device label exported in metrics"
         default "daget"
@@ -44,44 +51,6 @@ menu "CO2 Exporter Configuration"
                 Connected to the sensor's D (data) line. If you get no
                 readings, try swapping CLK and DATA — some ZG-01 units wire
                 the connector D, C, G instead of C, D, G.
-
-        config PIN_BUZZER
-            int "Buzzer GPIO"
-            default 14
-            help
-                Active buzzer (+). Avoid GPIO12 here — it is a strapping pin
-                (flash voltage) and driving it at boot can brick startup.
-
-    endmenu
-
-    config TZ_OFFSET_HOURS
-        int "UTC offset in hours"
-        default 1
-        help
-            Used only for the quiet-hours check. POSIX-free: the local hour is
-            computed as gmtime(now + offset*3600), so just set your raw offset
-            (e.g. 1 for UTC+1, -5 for UTC-5).
-
-    menu "CO2 alarm"
-
-        config CO2_ALARM_PPM
-            int "CO2 alarm threshold (ppm)"
-            default 900
-
-        config CO2_SUSTAIN_MS
-            int "Sustain time before alarm (ms)"
-            default 300000
-            help
-                CO2 must stay above the threshold this long before the buzzer
-                fires. Default is 5 minutes.
-
-        config QUIET_HOUR_START
-            int "Quiet hours start (inclusive, 0-23)"
-            default 23
-
-        config QUIET_HOUR_END
-            int "Quiet hours end (exclusive, 0-23)"
-            default 10
 
     endmenu
 

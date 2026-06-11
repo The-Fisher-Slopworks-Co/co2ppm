@@ -4,13 +4,13 @@
 #pragma once
 #include <stdint.h>
 
-// ZyAura ZG-01 sensor driver + buzzer alarm (ESP-IDF port).
+// ZyAura ZG-01 sensor driver (ESP-IDF port).
 //
 // Call zyaura_begin() once at startup, then zyaura_loop() repeatedly from a
 // task (e.g. every 10 ms). The clock line is sampled by a GPIO interrupt; the
-// loop only validates completed frames and drives the buzzer state machine.
+// loop only validates completed frames.
 
-void  zyaura_begin(int pin_clk, int pin_data, int pin_buzzer);
+void  zyaura_begin(int pin_clk, int pin_data);
 void  zyaura_loop(void);
 
 float zyaura_co2(void);   // ppm, or NAN if no data yet

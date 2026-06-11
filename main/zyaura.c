@@ -1,16 +1,14 @@
 // SPDX-FileCopyrightText: 2026 The Fisher Slopworks Co
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //
-// ZyAura ZG-01 sensor driver + buzzer alarm.
+// ZyAura ZG-01 sensor driver.
 // Protocol: https://revspace.nl/CO2MeterHacking
 //
-// Faithful port of the original Arduino/ESP8266 driver. The bit-banging and
-// the buzzer/alarm state machine are logically unchanged; only the platform
-// calls differ:
+// Faithful port of the original Arduino/ESP8266 driver. The bit-banging is
+// logically unchanged; only the platform calls differ:
 //   attachInterrupt    -> gpio_install_isr_service + gpio_isr_handler_add
 //   digitalRead        -> gpio_get_level
-//   digitalWrite       -> gpio_set_level
-//   micros()/millis()  -> esp_timer_get_time()
+//   micros()           -> esp_timer_get_time()
 //   noInterrupts()     -> portENTER_CRITICAL (spinlock shared with the ISR)
 //
 // The GPIO ISR is intentionally installed WITHOUT ESP_INTR_FLAG_IRAM: the only
@@ -21,12 +19,10 @@
 
 #include <math.h>
 #include <string.h>
-#include <time.h>
 
 #include "driver/gpio.h"
 #include "esp_timer.h"
 #include "freertos/FreeRTOS.h"
-#include "sdkconfig.h"
 
 // --- ZG-01 frame constants ---
 #define ID_TEMPERATURE  0x42  // 'B'  units: 1/16 K
@@ -34,15 +30,8 @@
 #define FRAME_BYTES     5
 #define GAP_RESET_US    2000
 
-// --- Buzzer timing (not user-tunable; matches the original config.h) ---
-#define BEEP_ON_MS         500    // buzzer on duration per beep
-#define BEEP_OFF_MS        500    // pause between beeps
-#define BEEPS_PER_ALARM    3      // beeps per alarm event
-#define ALARM_INTERVAL_MS  (5UL * 60 * 1000)  // min interval between alarms
-
 // --- Module state ---
 static int g_pin_data;
-static int g_pin_buzzer;
 
 // ISR state (guarded by s_mux, shared with the sensor task)
 static portMUX_TYPE      s_mux = portMUX_INITIALIZER_UNLOCKED;
@@ -57,19 +46,9 @@ static volatile uint32_t lastEdgeUs = 0;
 static float lastCO2ppm = NAN;
 static float lastTempC  = NAN;
 
-// Buzzer state machine
-enum BuzzerState { BZ_IDLE, BZ_ON, BZ_OFF };
-static enum BuzzerState buzzerState = BZ_IDLE;
-static uint8_t          beepsDone    = 0;
-static uint32_t         buzzerTimer  = 0;
-static uint32_t         lastAlarmMs  = 0;
-static bool             alarmEver    = false;
-static uint32_t         co2HighSince = 0;  // millis() when CO2 first exceeded threshold (0 = not high)
-
 // ---------------------------------------------------------------------------
-// Time helpers (Arduino millis()/micros() equivalents)
+// Time helpers (Arduino micros() equivalent)
 // ---------------------------------------------------------------------------
-static inline uint32_t millis(void) { return (uint32_t)(esp_timer_get_time() / 1000); }
 static inline uint32_t micros(void) { return (uint32_t)esp_timer_get_time(); }
 
 // ---------------------------------------------------------------------------
@@ -113,64 +92,10 @@ static void processFrame(const uint8_t f[]) {
 }
 
 // ---------------------------------------------------------------------------
-// Buzzer
-// ---------------------------------------------------------------------------
-static bool isQuietHour(void) {
-    time_t now = time(NULL);
-    if (now < 1000000000L) return false;  // NTP not synced
-    // Local time without messing with POSIX TZ strings: shift by the raw
-    // offset and read the broken-down value as if it were UTC.
-    time_t local = now + (time_t)CONFIG_TZ_OFFSET_HOURS * 3600;
-    struct tm t;
-    gmtime_r(&local, &t);
-    return t.tm_hour >= CONFIG_QUIET_HOUR_START || t.tm_hour < CONFIG_QUIET_HOUR_END;
-}
-
-static void updateBuzzer(void) {
-    if (buzzerState == BZ_IDLE) return;
-    uint32_t duration = (buzzerState == BZ_ON) ? BEEP_ON_MS : BEEP_OFF_MS;
-    if (millis() - buzzerTimer < duration) return;
-
-    buzzerTimer = millis();
-    if (buzzerState == BZ_ON) {
-        gpio_set_level(g_pin_buzzer, 0);
-        if (++beepsDone >= BEEPS_PER_ALARM) {
-            buzzerState = BZ_IDLE;
-        } else {
-            buzzerState = BZ_OFF;
-        }
-    } else {
-        gpio_set_level(g_pin_buzzer, 1);
-        buzzerState = BZ_ON;
-    }
-}
-
-static void checkAlarm(void) {
-    if (isnan(lastCO2ppm) || lastCO2ppm <= CONFIG_CO2_ALARM_PPM) {
-        co2HighSince = 0;  // reset on drop below threshold
-        return;
-    }
-    if (co2HighSince == 0) co2HighSince = millis();
-    if (millis() - co2HighSince < (uint32_t)CONFIG_CO2_SUSTAIN_MS) return;  // not sustained long enough
-
-    if (isQuietHour()) return;
-    if (buzzerState != BZ_IDLE) return;
-    if (alarmEver && millis() - lastAlarmMs < ALARM_INTERVAL_MS) return;
-
-    alarmEver   = true;
-    lastAlarmMs = millis();
-    beepsDone   = 0;
-    buzzerTimer = millis();
-    buzzerState = BZ_ON;
-    gpio_set_level(g_pin_buzzer, 1);
-}
-
-// ---------------------------------------------------------------------------
 // Public API
 // ---------------------------------------------------------------------------
-void zyaura_begin(int pin_clk, int pin_data, int pin_buzzer) {
-    g_pin_data   = pin_data;
-    g_pin_buzzer = pin_buzzer;
+void zyaura_begin(int pin_clk, int pin_data) {
+    g_pin_data = pin_data;
 
     gpio_config_t clk = {
         .pin_bit_mask = 1ULL << pin_clk,
@@ -190,24 +115,11 @@ void zyaura_begin(int pin_clk, int pin_data, int pin_buzzer) {
     };
     gpio_config(&dat);
 
-    gpio_config_t bz = {
-        .pin_bit_mask = 1ULL << pin_buzzer,
-        .mode         = GPIO_MODE_OUTPUT,
-        .pull_up_en   = GPIO_PULLUP_DISABLE,
-        .pull_down_en = GPIO_PULLDOWN_DISABLE,
-        .intr_type    = GPIO_INTR_DISABLE,
-    };
-    gpio_config(&bz);
-    gpio_set_level(g_pin_buzzer, 0);
-
     gpio_install_isr_service(0);  // flags = 0: handler may run from flash
     gpio_isr_handler_add(pin_clk, onClock, NULL);
 }
 
 void zyaura_loop(void) {
-    updateBuzzer();
-    checkAlarm();
-
     uint8_t f[FRAME_BYTES];
     bool have = false;
 

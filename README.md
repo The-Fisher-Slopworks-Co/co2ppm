@@ -17,10 +17,7 @@ build time (see [Configuration](#configuration)).
 
 - Reads CO2 (ppm) and temperature (°C) from ZG-01 via interrupt-driven bit-banging
 - HTTP `/metrics` endpoint in Prometheus text exposition format 0.0.4
-- WiFi station with hardcoded credentials and automatic reconnect
-- Buzzer alarm when CO2 exceeds the configured threshold (sustained for a configurable duration)
-- Quiet hours — buzzer suppressed during night
-- NTP time sync (configurable UTC offset)
+- WiFi station with hardcoded credentials, configurable hostname, and automatic reconnect
 
 ## Hardware
 
@@ -28,15 +25,13 @@ build time (see [Configuration](#configuration)).
 |-----------|-------------|
 | ESP32 dev board | Main microcontroller |
 | ZyAura ZG-01 | CO2 + temperature sensor (e.g. Voltcraft CO-100) |
-| Active buzzer | CO2 threshold alarm |
 
 ### Wiring (default pins)
 
 ```
 GPIO5  → ZG-C (clock)
 GPIO4  → ZG-D (data)
-GPIO14 → buzzer +
-GND    → ZG-G, buzzer −
+GND    → ZG-G
 ```
 
 Pins are configurable via `idf.py menuconfig` (see below).
@@ -44,10 +39,8 @@ Pins are configurable via `idf.py menuconfig` (see below).
 > **Note:** Some ZG-01 units have the connector in `D, C, G` order instead of
 > `C, D, G`. If you get no readings, try swapping CLK and DATA.
 >
-> Avoid using **GPIO12** for the buzzer — it is a strapping pin (flash voltage)
-> and driving it at boot can prevent startup. The default clock pin **GPIO5**
-> is also a strapping pin, but is safe here since it is only ever read as an
-> input after boot.
+> The default clock pin **GPIO5** is a strapping pin, but is safe here since it
+> is only ever read as an input after boot.
 
 > Sensor protocol reference: https://revspace.nl/CO2MeterHacking
 
@@ -65,15 +58,10 @@ All settings live in `idf.py menuconfig` under **CO2 Exporter Configuration**
 |---------|---------|-------------|
 | `WIFI_SSID` | `YOUR_WIFI_SSID` | Network to connect to (**must change**) |
 | `WIFI_PASSWORD` | `YOUR_WIFI_PASSWORD` | WiFi password (**must change**) |
+| `HOSTNAME` | `co2meter` | Hostname advertised to the network (DHCP/mDNS) |
 | `DEVICE_NAME` | `daget` | `device="..."` label on every metric |
 | `PIN_CLK` | `5` | ZG-01 clock GPIO |
 | `PIN_DATA` | `4` | ZG-01 data GPIO |
-| `PIN_BUZZER` | `14` | Buzzer GPIO |
-| `TZ_OFFSET_HOURS` | `1` | UTC offset in hours (quiet hours only) |
-| `CO2_ALARM_PPM` | `900` | CO2 threshold (ppm) to trigger the buzzer |
-| `CO2_SUSTAIN_MS` | `300000` | CO2 must stay above threshold this long before alarm fires (5 min) |
-| `QUIET_HOUR_START` | `23` | Quiet hours start (inclusive) |
-| `QUIET_HOUR_END` | `10` | Quiet hours end (exclusive) |
 
 You can also set the WiFi credentials in `sdkconfig.defaults` before the first
 build:

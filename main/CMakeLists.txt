@@ -10,6 +10,7 @@ idf_component_register(
         "metrics_server.c"
         "status_led.c"
         "reset_button.c"
+        "ota.c"
     INCLUDE_DIRS "."
     REQUIRES
         nvs_flash
@@ -19,5 +20,6 @@ idf_component_register(
         esp_http_server
         esp_timer
         esp_driver_gpio
+        app_update
         lwip
 )

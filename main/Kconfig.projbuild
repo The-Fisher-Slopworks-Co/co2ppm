@@ -117,4 +117,25 @@ menu "CO2 Exporter Configuration"
 
     endmenu
 
+    menu "OTA update (firmware over WiFi)"
+
+        config OTA_ENABLE
+            bool "Enable OTA firmware update endpoint"
+            default y
+            help
+                Adds a /update page and POST endpoint so new firmware can be
+                flashed over WiFi. Requires an OTA-capable partition table with
+                two app slots (see partitions.csv) and a 4MB flash.
+
+        config OTA_PASSWORD
+            string "OTA update password"
+            depends on OTA_ENABLE
+            default "changeme"
+            help
+                Must be sent in the X-OTA-Password header for an upload to be
+                accepted. CHANGE THIS — anyone on the network who knows it can
+                replace the device firmware.
+
+    endmenu
+
 endmenu

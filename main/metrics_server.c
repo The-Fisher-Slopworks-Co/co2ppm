@@ -16,6 +16,7 @@
 
 #include "esp_http_server.h"
 #include "esp_log.h"
+#include "ota.h"
 #include "sdkconfig.h"
 #include "wifi.h"
 #include "zyaura.h"
@@ -301,6 +302,9 @@ void metrics_server_begin(void) {
         ESP_LOGE(TAG, "failed to start HTTP server");
         return;
     }
+
+    // OTA routes first so they're matched before the wildcard catch-all below.
+    ota_register(server);
 
     // Register specific routes before the wildcard; first match wins.
     const httpd_uri_t routes[] = {

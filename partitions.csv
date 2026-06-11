@@ -1,0 +1,14 @@
+# SPDX-FileCopyrightText: 2026 The Fisher Slopworks Co
+# SPDX-License-Identifier: AGPL-3.0-or-later
+#
+# OTA-capable layout for a 4MB flash. Two app slots (ota_0/ota_1) let new
+# firmware be written to the inactive slot and booted from it; otadata records
+# which slot is active. nvs is kept at its original offset/size (0x9000/0x6000)
+# so stored WiFi credentials survive the switch from the single-app table.
+#
+# Name,     Type, SubType, Offset,   Size
+nvs,        data, nvs,     0x9000,   0x6000
+otadata,    data, ota,     0xf000,   0x2000
+phy_init,   data, phy,     0x11000,  0x1000
+ota_0,      app,  ota_0,   0x20000,  0x1F0000
+ota_1,      app,  ota_1,   0x210000, 0x1F0000

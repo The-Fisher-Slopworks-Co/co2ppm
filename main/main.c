@@ -19,6 +19,7 @@
 #include "sdkconfig.h"
 
 #include "metrics_server.h"
+#include "ota.h"
 #include "reset_button.h"
 #include "status_led.h"
 #include "wifi.h"
@@ -44,9 +45,20 @@ static status_led_t current_status(void) {
 }
 
 static void sensor_task(void *arg) {
+    bool ota_confirmed = false;
     for (;;) {
         zyaura_loop();
         status_led_set(current_status());
+
+        // A freshly OTA'd image must prove it can rejoin WiFi before we confirm
+        // it; otherwise the bootloader rolls it back on the next reboot. Tie this
+        // to a real connection (not setup mode) so a build that breaks the
+        // station link gets rolled back. Runs once; a no-op on normal boots.
+        if (!ota_confirmed && wifi_is_connected()) {
+            ota_mark_valid_if_pending();
+            ota_confirmed = true;
+        }
+
         vTaskDelay(pdMS_TO_TICKS(10));
     }
 }

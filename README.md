@@ -21,6 +21,7 @@ reflashing to change networks (see [WiFi setup](#wifi-setup)).
   self-healing fallback that never gets stuck in setup after a transient outage
   (see [WiFi setup](#wifi-setup))
 - Long-press factory reset on the on-board BOOT button (see [Factory reset](#factory-reset))
+- Over-the-air firmware updates with automatic rollback (see [Firmware update (OTA)](#firmware-update-ota))
 - On-board status LED that signals boot and runtime state at a glance (see [Status LED](#status-led))
 
 ## Hardware
@@ -72,6 +73,8 @@ All settings live in `idf.py menuconfig` under **CO2 Exporter Configuration**
 | `RESET_BUTTON_ENABLE` | `y` | Long-press factory reset button (see [Factory reset](#factory-reset)) |
 | `PIN_RESET_BUTTON` | `0` | Reset button GPIO (GPIO0 = on-board BOOT button) |
 | `RESET_HOLD_SECONDS` | `3` | Seconds to hold the button before it triggers |
+| `OTA_ENABLE` | `y` | Over-the-air firmware update endpoint (see [Firmware update (OTA)](#firmware-update-ota)) |
+| `OTA_PASSWORD` | `changeme` | Password required to push firmware (**change this**) |
 
 WiFi credentials are **not** configured here — they are entered at runtime
 through the [setup portal](#wifi-setup) and stored in NVS.
@@ -130,6 +133,40 @@ and reboots straight into the [setup portal](#wifi-setup).
 
 The button GPIO, hold time, and the feature itself are configurable under
 **Factory reset button** in `idf.py menuconfig`.
+
+## Firmware update (OTA)
+
+Once running, the device can be reflashed over WiFi — no USB cable.
+
+**Prerequisites (one-time):** OTA needs a **4MB flash** and a two-slot
+partition table (`partitions.csv`, already wired into the build). Because the
+flash layout itself can't be changed over the air, the **first** time you must
+flash over USB as usual (`idf.py flash`); every update after that can go over
+WiFi. Set your OTA password first under **OTA update** in `idf.py menuconfig`
+(the default is `changeme`).
+
+> Confirm your board really has 4MB:
+> `esptool --port /dev/ttyUSB0 flash_id` → look for `Detected flash size`.
+> For a 2MB module you'll need a tighter `partitions.csv` instead.
+
+**Updating from a browser:** open `http://<device-ip>/update`, enter the OTA
+password, pick the new `build/co2_exporter.bin`, and upload. The device flashes
+the inactive slot, reboots into it, and the page reports progress.
+
+**Updating from the command line:**
+
+```bash
+curl --data-binary @build/co2_exporter.bin \
+     -H "X-OTA-Password: <your-password>" \
+     http://<device-ip>/update
+```
+
+**Automatic rollback:** a freshly uploaded image boots on probation. It is
+kept only once the device confirms itself healthy (WiFi up or setup portal
+serving). If the new firmware can't get that far, the bootloader reverts to the
+previous working image on the next reboot — so a bad update can't brick the
+device over the air. The uploaded image is also integrity-checked before it is
+allowed to boot at all.
 
 ## Status LED
 

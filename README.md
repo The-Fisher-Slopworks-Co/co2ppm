@@ -98,6 +98,45 @@ idf.py -p /dev/ttyUSB0 flash monitor
 For other ESP32 variants use the matching target, e.g.
 `idf.py set-target esp32c3`.
 
+## Prebuilt releases
+
+Every `v*` tag publishes a
+[GitHub release](https://github.com/The-Fisher-Slopworks-Co/co2ppm/releases)
+with prebuilt images (built by CI), so you can flash a device without setting up
+ESP-IDF. Each release attaches four files:
+
+| File | What it is | Flash offset |
+|------|------------|--------------|
+| `co2_exporter.bin` | The application firmware itself | `0x20000` |
+| `bootloader.bin` | Second-stage bootloader | `0x1000` |
+| `partition-table.bin` | Partition table (the two-slot OTA layout) | `0x8000` |
+| `ota_data_initial.bin` | Initial OTA selector (boots slot `ota_0`) | `0xf000` |
+
+**Updating a device that already runs this firmware — over WiFi.** You only need
+`co2_exporter.bin`. Upload it on the `/update` page or with `curl` (see
+[Firmware update (OTA)](#firmware-update-ota)). The other three files only change
+if the bootloader or partition layout changes, which is rare.
+
+**Flashing a blank board (or recovering one) — over USB.** Write all four images
+to their offsets with [esptool](https://github.com/espressif/esptool); no ESP-IDF
+install required. esptool reads the flash settings from `bootloader.bin`, so the
+offsets are all you need:
+
+```bash
+esptool --chip esp32 -p /dev/ttyUSB0 write-flash \
+  0x1000  bootloader.bin \
+  0x8000  partition-table.bin \
+  0xf000  ota_data_initial.bin \
+  0x20000 co2_exporter.bin
+```
+
+This is the one-time USB flash the [OTA section](#firmware-update-ota) refers to;
+afterwards the device updates itself over WiFi. (Replace `/dev/ttyUSB0` with your
+serial port.)
+
+> **Cutting a release:** push a version tag and CI builds and publishes it:
+> `git tag -a vX.Y.Z -m "…" && git push origin vX.Y.Z`.
+
 ## WiFi setup
 
 Credentials are stored in NVS and entered over the air — there is nothing to
@@ -141,9 +180,10 @@ Once running, the device can be reflashed over WiFi — no USB cable.
 **Prerequisites (one-time):** OTA needs a **4MB flash** and a two-slot
 partition table (`partitions.csv`, already wired into the build). Because the
 flash layout itself can't be changed over the air, the **first** time you must
-flash over USB as usual (`idf.py flash`); every update after that can go over
-WiFi. Set your OTA password first under **OTA update** in `idf.py menuconfig`
-(the default is `changeme`).
+flash over USB as usual (`idf.py flash`, or the
+[prebuilt images](#prebuilt-releases)); every update after that can go over WiFi.
+Set your OTA password first under **OTA update** in `idf.py menuconfig` (the
+default is `changeme`).
 
 > Confirm your board really has 4MB:
 > `esptool --port /dev/ttyUSB0 flash_id` → look for `Detected flash size`.

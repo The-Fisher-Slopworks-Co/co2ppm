@@ -36,6 +36,7 @@ typedef struct {
 
 // Patterns, one per status. Each plays on a loop; see status_led.h for intent.
 static const led_step_t pat_boot[]   = {{true, 250}};
+static const led_step_t pat_setup[]  = {{true, 500}, {false, 500}};
 static const led_step_t pat_wifi[]   = {{true, 100}, {false, 100}};
 static const led_step_t pat_online[] = {{true, 80}, {false, 200}, {true, 80}, {false, 1600}};
 static const led_step_t pat_ok[]     = {{true, 60}, {false, 2940}};
@@ -50,6 +51,7 @@ typedef struct {
 // Indexed by status_led_t.
 static const led_pattern_t s_patterns[] = {
     [STATUS_LED_BOOT]   = PATTERN(pat_boot),
+    [STATUS_LED_SETUP]  = PATTERN(pat_setup),
     [STATUS_LED_WIFI]   = PATTERN(pat_wifi),
     [STATUS_LED_ONLINE] = PATTERN(pat_online),
     [STATUS_LED_OK]     = PATTERN(pat_ok),

@@ -6,8 +6,10 @@ idf_component_register(
         "main.c"
         "zyaura.c"
         "wifi.c"
+        "captive_dns.c"
         "metrics_server.c"
         "status_led.c"
+        "reset_button.c"
     INCLUDE_DIRS "."
     REQUIRES
         nvs_flash

@@ -3,20 +3,22 @@
 
 menu "CO2 Exporter Configuration"
 
-    menu "WiFi (hardcoded credentials)"
+    menu "WiFi"
 
-        config WIFI_SSID
-            string "WiFi SSID"
-            default "YOUR_WIFI_SSID"
+        config WIFI_SETUP_GRACE_SECONDS
+            int "Seconds offline before opening the setup portal"
+            default 30
+            range 5 600
             help
-                SSID of the network to connect to. Credentials are baked into
-                the firmware at build time — there is no captive portal.
+                WiFi credentials are stored in NVS and entered through the web
+                setup page — they are not baked into the firmware.
 
-        config WIFI_PASSWORD
-            string "WiFi password"
-            default "YOUR_WIFI_PASSWORD"
-            help
-                WPA/WPA2 password. Leave empty for an open network.
+                After a disconnect (or on a fresh device with no stored
+                credentials) the device keeps retrying the saved network for
+                this many seconds before raising the SoftAP setup portal. The
+                portal runs alongside the background reconnect attempts, so a
+                transient outage of the real network recovers on its own and the
+                portal disappears again once the device reconnects.
 
     endmenu
 
@@ -24,8 +26,8 @@ menu "CO2 Exporter Configuration"
         string "Hostname"
         default "co2meter"
         help
-            Hostname advertised to the network (DHCP/mDNS). Defaults to
-            "co2meter".
+            Hostname advertised to the network (DHCP/mDNS). Also the base for
+            the setup SoftAP name ("<hostname>-setup"). Defaults to "co2meter".
 
     config DEVICE_NAME
         string "Device label exported in metrics"
@@ -81,6 +83,37 @@ menu "CO2 Exporter Configuration"
             help
                 Enable if the LED lights when the GPIO is driven low (common on
                 boards where the LED sits between VCC and the pin).
+
+    endmenu
+
+    menu "Factory reset button"
+
+        config RESET_BUTTON_ENABLE
+            bool "Enable long-press factory reset button"
+            default y
+            help
+                Hold a push button (the on-board BOOT button on most ESP32
+                DevKit boards) to erase the stored WiFi credentials and reboot
+                into the setup portal. The button is sampled only at runtime, so
+                it does not affect GPIO0's boot strapping.
+
+        config PIN_RESET_BUTTON
+            int "Factory reset button GPIO"
+            depends on RESET_BUTTON_ENABLE
+            default 0
+            help
+                GPIO of an active-low push button (pressed = low). Defaults to
+                GPIO0, the on-board BOOT button. An internal pull-up is enabled,
+                so no external resistor is needed.
+
+        config RESET_HOLD_SECONDS
+            int "Seconds to hold for factory reset"
+            depends on RESET_BUTTON_ENABLE
+            default 3
+            range 1 10
+            help
+                How long the button must be held continuously before the reset
+                fires. Long enough to avoid an accidental tap.
 
     endmenu
 

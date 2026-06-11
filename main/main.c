@@ -19,6 +19,7 @@
 #include "sdkconfig.h"
 
 #include "metrics_server.h"
+#include "reset_button.h"
 #include "status_led.h"
 #include "wifi.h"
 #include "zyaura.h"
@@ -36,6 +37,7 @@ static void init_nvs(void) {
 
 // Translate the live WiFi/sensor state into a status LED pattern.
 static status_led_t current_status(void) {
+    if (wifi_in_setup())      return STATUS_LED_SETUP;
     if (!wifi_is_connected()) return STATUS_LED_WIFI;
     if (isnan(zyaura_co2()))  return STATUS_LED_ONLINE;
     return STATUS_LED_OK;
@@ -60,9 +62,10 @@ void app_main(void) {
 
     zyaura_begin(CONFIG_PIN_CLK, CONFIG_PIN_DATA);
 
-    status_led_set(STATUS_LED_WIFI);  // blink while wifi_begin() blocks
-    wifi_begin();
-    metrics_server_begin();
+    status_led_set(STATUS_LED_WIFI);  // until the sensor task starts reporting state
+    wifi_begin();         // non-blocking: events drive connect/setup transitions
+    metrics_server_begin();  // serves /metrics and the WiFi setup page
+    reset_button_begin();    // long-press BOOT to wipe credentials and reboot
 
     xTaskCreate(sensor_task, "sensor", 4096, NULL, 5, NULL);
 }

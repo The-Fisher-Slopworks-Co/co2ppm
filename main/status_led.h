@@ -10,6 +10,7 @@
 // serial monitor:
 //
 //   BOOT    solid on              early init (NVS/netif/sensor)
+//   SETUP   slow blink (1 Hz)     setup portal up, waiting to be configured
 //   WIFI    fast blink (~5 Hz)    connecting / no WiFi link
 //   ONLINE  double blink + pause  WiFi up, waiting for the first sensor frame
 //   OK      brief heartbeat flash WiFi up and sensor data is flowing
@@ -21,6 +22,7 @@
 
 typedef enum {
     STATUS_LED_BOOT,    // early init, before WiFi
+    STATUS_LED_SETUP,   // setup portal up, awaiting WiFi credentials
     STATUS_LED_WIFI,    // connecting to WiFi / link down
     STATUS_LED_ONLINE,  // WiFi up, no sensor data yet
     STATUS_LED_OK,      // WiFi up and sensor data available

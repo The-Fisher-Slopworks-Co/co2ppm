@@ -70,3 +70,8 @@ void wifi_begin(void) {
         ESP_LOGW(TAG, "not connected yet; will keep retrying in the background");
     }
 }
+
+bool wifi_is_connected(void) {
+    return s_wifi_events != NULL &&
+           (xEventGroupGetBits(s_wifi_events) & WIFI_CONNECTED_BIT) != 0;
+}

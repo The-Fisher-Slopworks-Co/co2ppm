@@ -18,6 +18,7 @@ build time (see [Configuration](#configuration)).
 - Reads CO2 (ppm) and temperature (°C) from ZG-01 via interrupt-driven bit-banging
 - HTTP `/metrics` endpoint in Prometheus text exposition format 0.0.4
 - WiFi station with hardcoded credentials, configurable hostname, and automatic reconnect
+- On-board status LED that signals boot and runtime state at a glance (see [Status LED](#status-led))
 
 ## Hardware
 
@@ -32,6 +33,7 @@ build time (see [Configuration](#configuration)).
 GPIO5  → ZG-C (clock)
 GPIO4  → ZG-D (data)
 GND    → ZG-G
+GPIO2  → status LED (on-board on most DevKit boards)
 ```
 
 Pins are configurable via `idf.py menuconfig` (see below).
@@ -62,6 +64,9 @@ All settings live in `idf.py menuconfig` under **CO2 Exporter Configuration**
 | `DEVICE_NAME` | `daget` | `device="..."` label on every metric |
 | `PIN_CLK` | `5` | ZG-01 clock GPIO |
 | `PIN_DATA` | `4` | ZG-01 data GPIO |
+| `STATUS_LED_ENABLE` | `y` | Drive an on-board status LED |
+| `PIN_STATUS_LED` | `2` | Status LED GPIO |
+| `STATUS_LED_ACTIVE_LOW` | `n` | Set if the LED lights when the pin is driven low |
 
 You can also set the WiFi credentials in `sdkconfig.defaults` before the first
 build:
@@ -88,6 +93,23 @@ idf.py -p /dev/ttyUSB0 flash monitor
 
 For other ESP32 variants use the matching target, e.g.
 `idf.py set-target esp32c3`.
+
+## Status LED
+
+The on-board LED (GPIO2 by default) blinks a pattern that tells you where the
+firmware is in its boot/run cycle, so you can diagnose a board without a serial
+monitor:
+
+| Pattern | State | Meaning |
+|---------|-------|---------|
+| Solid on | Booting | Early init (NVS, network stack, sensor) |
+| Fast blink (~5 Hz) | Connecting | Joining WiFi, or the link is down |
+| Double blink, then pause | Online | WiFi up, waiting for the first sensor frame |
+| Brief heartbeat flash | Running | WiFi up and sensor data is flowing — all good |
+
+The LED reflects live state: if WiFi drops it returns to the fast blink, and if
+the sensor stops reporting it falls back to the double blink. Disable it (or
+change the pin / polarity) under **Status LED** in `idf.py menuconfig`.
 
 ## Metrics
 

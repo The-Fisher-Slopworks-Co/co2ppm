@@ -8,6 +8,8 @@
 // ESP8266/Arduino firmware; the Arduino setup()/loop() model becomes app_main()
 // plus a dedicated sensor task.
 
+#include <math.h>
+
 #include "esp_event.h"
 #include "esp_log.h"
 #include "esp_netif.h"
@@ -17,6 +19,7 @@
 #include "sdkconfig.h"
 
 #include "metrics_server.h"
+#include "status_led.h"
 #include "wifi.h"
 #include "zyaura.h"
 
@@ -31,9 +34,17 @@ static void init_nvs(void) {
     ESP_ERROR_CHECK(err);
 }
 
+// Translate the live WiFi/sensor state into a status LED pattern.
+static status_led_t current_status(void) {
+    if (!wifi_is_connected()) return STATUS_LED_WIFI;
+    if (isnan(zyaura_co2()))  return STATUS_LED_ONLINE;
+    return STATUS_LED_OK;
+}
+
 static void sensor_task(void *arg) {
     for (;;) {
         zyaura_loop();
+        status_led_set(current_status());
         vTaskDelay(pdMS_TO_TICKS(10));
     }
 }
@@ -41,11 +52,15 @@ static void sensor_task(void *arg) {
 void app_main(void) {
     ESP_LOGI(TAG, "CO2 meter starting...");
 
+    status_led_begin();  // solid on while we bring the system up
+
     init_nvs();
     ESP_ERROR_CHECK(esp_netif_init());
     ESP_ERROR_CHECK(esp_event_loop_create_default());
 
     zyaura_begin(CONFIG_PIN_CLK, CONFIG_PIN_DATA);
+
+    status_led_set(STATUS_LED_WIFI);  // blink while wifi_begin() blocks
     wifi_begin();
     metrics_server_begin();
 
